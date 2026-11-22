@@ -1,0 +1,82 @@
+// LSM coil test - 2x L298N, 4 coils
+// Stage 1: Coil A (25/26) + Coil B (27/32)  -> L298N #1
+// Stage 2: Coil C (13/21) + Coil D (16/17)  -> L298N #2
+// Serial Monitor @ 115200:
+//   f/r kick A   g/v kick B   k/l kick C   o/p kick D
+//   1/! hold STAGE 1 fwd/rev    2/@ hold STAGE 2 fwd/rev
+//   s = kick stage 1 then stage 2 (mini launch sequence)
+
+const int CA1 = 25, CA2 = 26;   // coil A
+const int CB1 = 27, CB2 = 32;   // coil B
+const int CC1 = 13, CC2 = 21;   // coil C
+const int CD1 = 16, CD2 = 17;   // coil D
+
+const int KICK_MS = 40;
+const int HOLD_MS = 300;
+const int COOLDOWN_MS = 2000;
+const int STAGE_GAP_MS = 60;    // delay between stage 1 and 2 in 's'
+
+const int pinsA[2] = {CA1, CA2};
+const int pinsB[2] = {CB1, CB2};
+const int pinsC[2] = {CC1, CC2};
+const int pinsD[2] = {CD1, CD2};
+
+void allOff() {
+  int all[] = {CA1, CA2, CB1, CB2, CC1, CC2, CD1, CD2};
+  for (int p : all) digitalWrite(p, LOW);
+}
+
+void setCoil(const int *p, bool forward) {
+  digitalWrite(p[0], forward ? HIGH : LOW);
+  digitalWrite(p[1], forward ? LOW : HIGH);
+}
+
+void fire(bool a, bool b, bool c, bool d, bool forward, int ms) {
+  if (a) setCoil(pinsA, forward);
+  if (b) setCoil(pinsB, forward);
+  if (c) setCoil(pinsC, forward);
+  if (d) setCoil(pinsD, forward);
+  delay(ms);
+  allOff();
+  Serial.printf("%s%s%s%s%s %d ms\n", a ? "A " : "", b ? "B " : "",
+                c ? "C " : "", d ? "D " : "", forward ? "FWD" : "REV", ms);
+}
+
+void setup() {
+  int all[] = {CA1, CA2, CB1, CB2, CC1, CC2, CD1, CD2};
+  for (int p : all) pinMode(p, OUTPUT);
+  allOff();
+  Serial.begin(115200);
+  delay(500);
+  Serial.println("\n4-coil test ready.");
+  Serial.println("f/r A | g/v B | k/l C | o/p D | 1/! stage1 | 2/@ stage2 | s sequence");
+}
+
+void loop() {
+  if (!Serial.available()) return;
+  char c = Serial.read();
+
+  switch (c) {
+    case 'f': fire(1,0,0,0, true,  KICK_MS); break;
+    case 'r': fire(1,0,0,0, false, KICK_MS); break;
+    case 'g': fire(0,1,0,0, true,  KICK_MS); break;
+    case 'v': fire(0,1,0,0, false, KICK_MS); break;
+    case 'k': fire(0,0,1,0, true,  KICK_MS); break;
+    case 'l': fire(0,0,1,0, false, KICK_MS); break;
+    case 'o': fire(0,0,0,1, true,  KICK_MS); break;
+    case 'p': fire(0,0,0,1, false, KICK_MS); break;
+    case '1': fire(1,1,0,0, true,  HOLD_MS); delay(COOLDOWN_MS); break;
+    case '!': fire(1,1,0,0, false, HOLD_MS); delay(COOLDOWN_MS); break;
+    case '2': fire(0,0,1,1, true,  HOLD_MS); delay(COOLDOWN_MS); break;
+    case '@': fire(0,0,1,1, false, HOLD_MS); delay(COOLDOWN_MS); break;
+    case 's':
+      fire(1,1,0,0, true, KICK_MS);   // stage 1
+      delay(STAGE_GAP_MS);
+      fire(0,0,1,1, true, KICK_MS);   // stage 2
+      delay(COOLDOWN_MS);
+      break;
+    default: break;
+  }
+
+  while (Serial.available()) Serial.read();
+}
