@@ -1,0 +1,62 @@
+// Coil feel test - ESP32 + L298N
+// Coil A (OUT1/OUT2): IN1 = GPIO 25, IN2 = GPIO 26
+// Coil B (OUT3/OUT4): IN3 = GPIO 27, IN4 = GPIO 32
+// Serial Monitor @ 115200:
+//   f/r = kick A fwd/rev (40 ms)    h/j = HOLD A fwd/rev (300 ms)
+//   g/v = kick B fwd/rev
+//   b/c = kick BOTH fwd/rev         n/m = HOLD BOTH fwd/rev (300 ms)
+
+const int CA1 = 25, CA2 = 26;   // coil A
+const int CB1 = 27, CB2 = 32;   // coil B
+
+const int KICK_MS = 40;
+const int HOLD_MS = 300;
+const int HOLD_COOLDOWN_MS = 2000;
+
+void allOff() {
+  digitalWrite(CA1, LOW); digitalWrite(CA2, LOW);
+  digitalWrite(CB1, LOW); digitalWrite(CB2, LOW);
+}
+
+void drive(bool useA, bool useB, bool forward, int ms) {
+  if (useA) { digitalWrite(CA1, forward ? HIGH : LOW); digitalWrite(CA2, forward ? LOW : HIGH); }
+  if (useB) { digitalWrite(CB1, forward ? HIGH : LOW); digitalWrite(CB2, forward ? LOW : HIGH); }
+  delay(ms);
+  allOff();
+  Serial.print(useA ? "A " : "");
+  Serial.print(useB ? "B " : "");
+  Serial.print(forward ? "FWD " : "REV ");
+  Serial.print(ms);
+  Serial.println(" ms");
+}
+
+void setup() {
+  pinMode(CA1, OUTPUT); pinMode(CA2, OUTPUT);
+  pinMode(CB1, OUTPUT); pinMode(CB2, OUTPUT);
+  allOff();
+  Serial.begin(115200);
+  delay(500);
+  Serial.println("\nCoil feel test ready.");
+  Serial.println("f/r kick A | h/j hold A | g/v kick B | b/c kick both | n/m hold both");
+}
+
+void loop() {
+  if (!Serial.available()) return;
+  char c = Serial.read();
+
+  switch (c) {
+    case 'f': drive(true,  false, true,  KICK_MS); break;
+    case 'r': drive(true,  false, false, KICK_MS); break;
+    case 'g': drive(false, true,  true,  KICK_MS); break;
+    case 'v': drive(false, true,  false, KICK_MS); break;
+    case 'b': drive(true,  true,  true,  KICK_MS); break;
+    case 'c': drive(true,  true,  false, KICK_MS); break;
+    case 'h': drive(true,  false, true,  HOLD_MS); delay(HOLD_COOLDOWN_MS); break;
+    case 'j': drive(true,  false, false, HOLD_MS); delay(HOLD_COOLDOWN_MS); break;
+    case 'n': drive(true,  true,  true,  HOLD_MS); delay(HOLD_COOLDOWN_MS); break;
+    case 'm': drive(true,  true,  false, HOLD_MS); delay(HOLD_COOLDOWN_MS); break;
+    default: break;
+  }
+
+  while (Serial.available()) Serial.read();
+}
